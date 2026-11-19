@@ -1,5 +1,4 @@
-
-pipeline {
+ppipeline {
     agent any
 
     options {
@@ -21,12 +20,35 @@ pipeline {
                     docker rm -f monapp-test 2>NUL
                     docker run -d --name monapp-test -p 8083:80 monapp:build-%BUILD_NUMBER%
                     if errorlevel 1 exit /b 1
-                    timeout /t 3 /nobreak >NUL
+                    powershell -NoProfile -Command "Start-Sleep -Seconds 3"
                     curl.exe -f http://localhost:8083/
                     set TEST_RESULT=%ERRORLEVEL%
                     docker rm -f monapp-test
                     exit /b %TEST_RESULT%
                 '''
+            }
+        }
+
+        stage('Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    powershell '''
+                        $env:DOCKER_PASS | docker login --username $env:DOCKER_USER --password-stdin
+                        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+                        docker tag "monapp:build-$env:BUILD_NUMBER" "$env:DOCKER_USER/monapp:latest"
+                        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+                        docker push "$env:DOCKER_USER/monapp:latest"
+                        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+                        docker logout
+                    '''
+                }
             }
         }
     }
