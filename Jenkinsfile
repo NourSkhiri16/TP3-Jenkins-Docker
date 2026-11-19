@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -32,7 +33,7 @@ pipeline {
 
     post {
         always {
-            bat 'docker rm -f monapp-test 2>NUL'
+            echo 'Pipeline finished.'
         }
     }
 }
