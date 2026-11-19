@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -37,8 +38,25 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     powershell '''
-                        $env:DOCKER_PASS | docker login --username $env:DOCKER_USER --password-stdin
-                        if ($LASTEXITCODE -ne 0) { exit 1 }
+                        $psi = New-Object System.Diagnostics.ProcessStartInfo
+                        $psi.FileName = "docker"
+                        $psi.Arguments = "login --username $env:DOCKER_USER --password-stdin"
+                        $psi.UseShellExecute = $false
+                        $psi.RedirectStandardInput = $true
+                        $psi.RedirectStandardOutput = $true
+                        $psi.RedirectStandardError = $true
+
+                        $p = New-Object System.Diagnostics.Process
+                        $p.StartInfo = $psi
+                        [void]$p.Start()
+                        $p.StandardInput.WriteLine($env:DOCKER_PASS)
+                        $p.StandardInput.Close()
+                        $p.WaitForExit()
+
+                        if ($p.ExitCode -ne 0) {
+                            Write-Error $p.StandardError.ReadToEnd()
+                            exit 1
+                        }
 
                         docker tag "monapp:build-$env:BUILD_NUMBER" "$env:DOCKER_USER/monapp:latest"
                         if ($LASTEXITCODE -ne 0) { exit 1 }
